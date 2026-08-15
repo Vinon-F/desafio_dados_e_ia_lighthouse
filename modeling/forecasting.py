@@ -1,10 +1,10 @@
 import pandas as pd
 
 # 1. CARREGAMENTO DOS DADOS
-products = pd.read_csv('./csv/products.csv')
-variants = pd.read_csv('./csv/product_variants.csv')
-orders   = pd.read_csv('./csv/orders.csv', parse_dates=['placed_at'])
-items    = pd.read_csv('./csv/order_items.csv')
+products = pd.read_csv('../csv/products.csv')
+variants = pd.read_csv('../csv/product_variants.csv')
+orders   = pd.read_csv('../csv/orders.csv', parse_dates=['placed_at'])
+items    = pd.read_csv('../csv/order_items.csv')
 
 # 2. UNIFICAÇÃO DO DATASET
 # Filtra o produto pelo nome (existem 2 product_id com o mesmo nome -> tratados juntos)
