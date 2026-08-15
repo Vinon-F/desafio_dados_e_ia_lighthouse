@@ -1,189 +1,124 @@
-import os
-import time
-import csv
-import re
-import logging
-import unicodedata
-from typing import Any, List
-import psycopg2
-from psycopg2 import sql
-from psycopg2.extras import execute_values
-from dotenv import load_dotenv
+import pandas as pd
 
-load_dotenv()
 
-CSV_DIR = 'csv' # Diretório CSV's
-BATCH_SIZE = 10000 # Ajuste para performance
+# 1. CARREGAMENTO DOS DADOS
 
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s [%(levelname)s] %(message)s',
-    datefmt='%Y-%m-%d %H:%M:%S',
-)
-logger = logging.getLogger(__name__)
+products = pd.read_csv('./csv/products.csv')
+variants = pd.read_csv('./csv/product_variants.csv')
+orders   = pd.read_csv('./csv/orders.csv', parse_dates=['placed_at'])
+items    = pd.read_csv('./csv/order_items.csv')
 
-def sanitize_name(name: str) -> str:
-    name = unicodedata.normalize('NFKD', name).encode('ASCII', 'ignore').decode('ASCII')
-    name = re.sub(r'[^\w]', '_', name)
-    name = re.sub(r'_+', '_', name)
-    name = name.strip('_')
-    if name and name[0].isdigit():
-        name = f'col_{name}'
-    return name.lower()
+products = products.rename(columns={'id': 'product_id'})
+variants = variants.rename(columns={'id': 'variant_id'})
+orders   = orders.rename(columns={'id': 'order_id'})
 
-def get_db_connection():
-    return psycopg2.connect(
-        host=os.getenv('DB_HOST'),
-        port=os.getenv('DB_PORT'),
-        dbname=os.getenv('DB_NAME'),
-        user=os.getenv('DB_USER'),
-        password=os.getenv('DB_PASSWORD')
+if 'id' in items.columns:
+    items = items.rename(columns={'id': 'order_item_id'})
+
+# CRIAÇÃO DO DATASET UNIFICADO (todos os produtos)
+
+def criar_dataset_unificado(items, orders, variants, products,
+                             status_validos=('paid', 'confirmed')):
+
+    df = items.merge(
+        orders[['order_id', 'placed_at', 'status']],
+        on='order_id',
+        how='left',
+        validate='many_to_one'
     )
 
-def get_table_columns(cur: Any, table_name: str) -> List[str]:
-    cur.execute("""
-        SELECT column_name
-        FROM information_schema.columns
-        WHERE table_name = %s
-        ORDER BY ordinal_position;
-    """, (table_name,))
-    return [row[0] for row in cur.fetchall()]
+    df = df.merge(
+        variants[['variant_id', 'product_id', 'sku']],
+        left_on='product_variant_id',
+        right_on='variant_id',
+        how='left',
+        validate='many_to_one'
+    )
 
-def parse_value(value: str) -> Any:
-    # Correção de tipo para Postgres
-    if value == '':
-        return None
-    return value
+    df = df.merge(
+        products[['product_id', 'name']],
+        on='product_id',
+        how='left',
+        validate='many_to_one'
+    )
 
-def load_csv_file(file_path: str, conn: Any) -> bool:
+    # Checagem de integridade: o merge não pode ter alterado a
+    assert len(df) == len(items), (
+        f"Merge alterou o número de linhas: {len(items)} -> {len(df)}. "
+        "Verifique duplicidade de chaves em variants/products/orders."
+    )
 
-    start_time = time.time()
+    # Filtro de status aplicado dentro da função unificadora, mas
 
-    table_name = os.path.splitext(os.path.basename(file_path))[0]
-    table_name = sanitize_name(table_name)
+    df = df[df['status'].isin(status_validos)].copy()
 
-    try:
-        with conn.cursor() as cur:
-            columns_in_db = get_table_columns(cur, table_name)
+    return df
 
-            if not columns_in_db:
-                logger.warning(f"Table '{table_name}' does not exist in the database. Skipping.")
-                return False
 
-            with open(file_path, mode='r', encoding='utf-8', errors='replace') as f:
-                reader = csv.reader(f)
+def filtrar_por_nome_produto(df, nome_produto):
+    """
+    Filtra o dataset unificado por nome de produto.
+    Trata o caso de nomes duplicados com product_id distintos
+    (ex.: cadastro duplicado no catálogo) agregando-os juntos.
+    """
+    ids = df.loc[df['name'] == nome_produto, 'product_id'].unique().tolist()
+    if not ids:
+        raise ValueError(f"Nenhum product_id encontrado para '{nome_produto}'")
+    return df[df['product_id'].isin(ids)].copy()
 
-                try:
-                    header = next(reader)
-                except StopIteration:
-                    logger.warning(f"File '{file_path}' is empty. Skipping.")
-                    return False
 
-                index_map = {}
-                unmatched = []
-                for idx, col in enumerate(header):
-                    sanitized_col = sanitize_name(col)
-                    if sanitized_col in columns_in_db:
-                        index_map[idx] = sanitized_col
-                    else:
-                        unmatched.append(col)
+def agregar_mensal(df, coluna_qtd='quantity'):
+    """
+    Agrega quantidade vendida por mês, preenchendo meses sem venda
+    com 0 para manter a continuidade da série temporal.
+    """
+    df = df.copy()
+    df['month'] = df['placed_at'].dt.to_period('M')
+    monthly = df.groupby('month')[coluna_qtd].sum().sort_index()
 
-                if unmatched:
-                    logger.warning(f"'{table_name}': headers not matched to any column: {unmatched}")
+    full_idx = pd.period_range(monthly.index.min(), monthly.index.max(), freq='M')
+    monthly = monthly.reindex(full_idx, fill_value=0)
+    return monthly
 
-                if not index_map:
-                    logger.warning(f"No matching columns found for table '{table_name}'. Skipping.")
-                    return False
+# 3. APLICAÇÃO: dataset unificado -> produto alvo -> série mensal
 
-                sorted_indices = sorted(index_map.keys())
-                columns = [index_map[idx] for idx in sorted_indices]
+dataset = criar_dataset_unificado(items, orders, variants, products)
 
-                truncate_sql = sql.SQL("TRUNCATE TABLE {} CASCADE;").format(
-                    sql.Identifier(table_name)
-                )
-                insert_sql = sql.SQL("INSERT INTO {} ({}) VALUES %s").format(
-                    sql.Identifier(table_name),
-                    sql.SQL(', ').join(sql.Identifier(c) for c in columns)
-                )
+produto_alvo = filtrar_por_nome_produto(dataset, 'Bússola de Bordo 702')
 
-                logger.info(f"Truncating '{table_name}' (CASCADE — dependent rows in other tables will also be removed).")
-                cur.execute(truncate_sql)
+monthly = agregar_mensal(produto_alvo)
 
-                batch = []
-                total_inserted = 0
+# 4. BASELINE: MÉDIA MÓVEL DOS ÚLTIMOS 3 MESES
 
-                for row in reader:
-                    row_values = [
-                        parse_value(row[idx] if idx < len(row) else '')
-                        for idx in sorted_indices
-                    ]
+treino = monthly[monthly.index <= pd.Period('2025-12', freq='M')]
 
-                    batch.append(tuple(row_values))
+prev_jan = treino.tail(3).mean()
+prev_fev = (treino.tail(2).sum() + prev_jan) / 3
+prev_mar = (treino.tail(1).sum() + prev_jan + prev_fev) / 3
 
-                    if len(batch) >= BATCH_SIZE:
-                        execute_values(cur, insert_sql, batch)
-                        total_inserted += len(batch)
-                        batch = []
+previsoes = [prev_jan, prev_fev, prev_mar]
 
-                if batch:
-                    execute_values(cur, insert_sql, batch)
-                    total_inserted += len(batch)
+# PREVISÕES PARA O 1º TRIMESTRE DE 2026
+test_months = pd.period_range('2026-01', '2026-03', freq='M')
 
-        conn.commit()
-        elapsed_time = time.time() - start_time
-        logger.info(f"SUCCESS: Loaded {total_inserted} raw rows into '{table_name}' in {elapsed_time:.2f}s.")
-        return True
+resultados = []
+for mes, previsto in zip(test_months, previsoes):
+    real = monthly[mes]
+    erro_abs = abs(previsto - real)
+    resultados.append({
+        'mes': str(mes),
+        'previsto': round(previsto, 2),
+        'real': int(real),
+        'erro_abs': round(erro_abs, 2)
+    })
 
-    except psycopg2.errors.InvalidTextRepresentation as e:
+df_resultado = pd.DataFrame(resultados)
+print(df_resultado)
 
-        conn.rollback()
-        logger.error(f"'{table_name}': incompatible data for column type. File not loaded. Details: {e}")
-        return False
+# MÉTRICAS (MAE)
+mae = df_resultado['erro_abs'].mean()
+print(f'\nMAE: {mae:.2f} unidades')
 
-    except psycopg2.OperationalError as e:
-        conn.rollback()
-        logger.error(f"'{table_name}': database connection error. File not loaded. Details: {e}")
-        return False
-
-    except psycopg2.Error as e:
-        conn.rollback()
-        logger.error(f"'{table_name}': database error. File not loaded. Details: {e}")
-        return False
-
-def main() -> None:
-    if not os.path.isdir(CSV_DIR):
-        logger.error(f"The directory '{CSV_DIR}' was not found.")
-        return
-
-    csv_files = [f for f in os.listdir(CSV_DIR) if f.lower().endswith('.csv')]
-
-    if not csv_files:
-        logger.warning(f"No CSV files found inside '{CSV_DIR}/'")
-        return
-
-    logger.info("Starting database connection...")
-    conn = get_db_connection()
-
-    overall_start_time = time.time()
-    succeeded, failed = [], []
-
-    try:
-        for file_name in sorted(csv_files):
-            logger.info(f"Processing: {file_name}...")
-            ok = load_csv_file(os.path.join(CSV_DIR, file_name), conn)
-            (succeeded if ok else failed).append(file_name)
-
-        total_elapsed = time.time() - overall_start_time
-        logger.info(
-            f"Data loading finished in {total_elapsed:.2f}s. "
-            f"{len(succeeded)} succeeded, {len(failed)} failed/skipped."
-        )
-        if failed:
-            logger.warning(f"Files not loaded: {failed}")
-
-    finally:
-        conn.close()
-        logger.info("Database connection closed.")
-
-if __name__ == "__main__":
-    main()
+print(f"Média histórica mensal (treino): {treino.mean():.2f}")
+print(f"MAE como % da média histórica: {mae / treino.mean():.1%}")
+print(f"Previsão do total de vendas para o primeiro trimestre: {round(df_resultado['previsto'].sum())}")
