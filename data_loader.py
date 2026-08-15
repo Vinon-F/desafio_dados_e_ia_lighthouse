@@ -5,15 +5,15 @@ import re
 import logging
 import unicodedata
 from typing import Any, List
-import psycopg2  # pip install psycopg2-binary
+import psycopg2
 from psycopg2 import sql
 from psycopg2.extras import execute_values
-from dotenv import load_dotenv  # pip install python-dotenv
+from dotenv import load_dotenv
 
 load_dotenv()
 
 CSV_DIR = 'csv'
-BATCH_SIZE = 10000  # Number of rows to insert per batch (optimizes performance)
+BATCH_SIZE = 10000
 
 logging.basicConfig(
     level=logging.INFO,
@@ -50,13 +50,10 @@ def get_table_columns(cur: Any, table_name: str) -> List[str]:
     return [row[0] for row in cur.fetchall()]
 
 def parse_value(value: str) -> Any:
+    # Correção de tipo para Postgres
     if value == '':
         return None
     return value
-
-# ==========================================
-# MAIN LOGIC
-# ==========================================
 
 def load_csv_file(file_path: str, conn: Any) -> bool:
 
@@ -83,12 +80,14 @@ def load_csv_file(file_path: str, conn: Any) -> bool:
                     return False
 
                 index_map = {}
+                unmatched = []
                 for idx, col in enumerate(header):
                     sanitized_col = sanitize_name(col)
                     if sanitized_col in columns_in_db:
                         index_map[idx] = sanitized_col
+                    else:
+                        unmatched.append(col)
 
-                unmatched = [col for col in header if sanitize_name(col) not in columns_in_db]
                 if unmatched:
                     logger.warning(f"'{table_name}': headers not matched to any column: {unmatched}")
 
@@ -96,7 +95,9 @@ def load_csv_file(file_path: str, conn: Any) -> bool:
                     logger.warning(f"No matching columns found for table '{table_name}'. Skipping.")
                     return False
 
-                columns = [index_map[idx] for idx in sorted(index_map.keys())]
+                # Calculado uma única vez, fora do loop de linhas.
+                sorted_indices = sorted(index_map.keys())
+                columns = [index_map[idx] for idx in sorted_indices]
 
                 truncate_sql = sql.SQL("TRUNCATE TABLE {} CASCADE;").format(
                     sql.Identifier(table_name)
@@ -113,10 +114,10 @@ def load_csv_file(file_path: str, conn: Any) -> bool:
                 total_inserted = 0
 
                 for row in reader:
-                    row_values = []
-                    for idx in sorted(index_map.keys()):
-                        val = row[idx] if idx < len(row) else ''
-                        row_values.append(parse_value(val))
+                    row_values = [
+                        parse_value(row[idx] if idx < len(row) else '')
+                        for idx in sorted_indices
+                    ]
 
                     batch.append(tuple(row_values))
 
