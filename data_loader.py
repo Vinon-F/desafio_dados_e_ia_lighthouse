@@ -12,8 +12,8 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-CSV_DIR = 'csv'
-BATCH_SIZE = 10000
+CSV_DIR = 'csv' # Diretório CSV's
+BATCH_SIZE = 10000 # Ajuste para performance
 
 logging.basicConfig(
     level=logging.INFO,
@@ -95,7 +95,6 @@ def load_csv_file(file_path: str, conn: Any) -> bool:
                     logger.warning(f"No matching columns found for table '{table_name}'. Skipping.")
                     return False
 
-                # Calculado uma única vez, fora do loop de linhas.
                 sorted_indices = sorted(index_map.keys())
                 columns = [index_map[idx] for idx in sorted_indices]
 
