@@ -4,10 +4,6 @@ import re
 from datetime import datetime
 import unicodedata
 
-# ==========================================
-# CONFIGURATIONS
-# ==========================================
-
 CSV_DIR = 'csv'
 OUTPUT_SQL = 'schema.sql'
 
@@ -44,7 +40,7 @@ def infer_value_type(value):
     if val.lstrip('-').isdigit():
         clean_val = val.lstrip('-')
         
-        # HEURISTIC 1: Números começando com 0.. Ex: 01312 = Text
+        # HEURISTIC 1: Números começando com 0.. Ex: 01312
         if len(clean_val) > 1 and clean_val.startswith('0'):
             return 'TEXT'
             
@@ -60,7 +56,7 @@ def infer_value_type(value):
         else:
             return 'BIGINT'
 
-    # 3. Numerico (Float/Decimal)
+    # 3. Numeric (Float/Decimal)
     try:
         float(val)
         if '.' in val or ',' in val:
@@ -91,9 +87,6 @@ def infer_value_type(value):
     return 'TEXT'
 
 def process_csv(file_path):
-    """
-    Reads a CSV file and returns a list of tuples: (sanitized_column_name, pg_type)
-    """
     table_name = os.path.splitext(os.path.basename(file_path))[0]
     table_name = sanitize_name(table_name)
     
