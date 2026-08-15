@@ -12,7 +12,7 @@ from dotenv import load_dotenv  # pip install python-dotenv
 
 load_dotenv()
 
-CSV_DIR = 'csv'
+CSV_DIR = '../csv'
 BATCH_SIZE = 10000
 
 logging.basicConfig(

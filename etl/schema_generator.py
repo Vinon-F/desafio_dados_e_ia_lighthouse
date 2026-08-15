@@ -4,7 +4,7 @@ import re
 from datetime import datetime
 import unicodedata
 
-CSV_DIR = 'csv'
+CSV_DIR = '../csv'
 OUTPUT_SQL = 'schema.sql'
 
 TYPE_RANK = {

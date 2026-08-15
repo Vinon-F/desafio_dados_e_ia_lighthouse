@@ -12,7 +12,7 @@ except ImportError:
     )
 
 try:
-    from dotenv import load_dotenv
+    from dotenv import load_dotenv, find_dotenv
 except ImportError:
     sys.exit(
         "Erro: a biblioteca 'python-dotenv' não está instalada.\n"
@@ -21,11 +21,16 @@ except ImportError:
 
 
 def carregar_configuracao(env_file: str) -> dict:
-    """Carrega as variáveis do .env e valida se todas estão presentes."""
-    if not Path(env_file).exists():
-        sys.exit(f"Erro: arquivo de ambiente '{env_file}' não encontrado.")
+    dotenv_path = find_dotenv(filename=env_file, usecwd=True)
 
-    load_dotenv(dotenv_path=env_file)
+    if not dotenv_path:
+        sys.exit(
+            f"Erro: arquivo de ambiente '{env_file}' não encontrado "
+            "(buscado no diretório atual e em seus diretórios superiores)."
+        )
+
+    load_dotenv(dotenv_path=dotenv_path)
+    print(f"Variáveis de ambiente carregadas de: {dotenv_path}")
 
     variaveis_obrigatorias = ["DB_HOST", "DB_PORT", "DB_NAME", "DB_USER", "DB_PASSWORD"]
     config = {var: os.getenv(var) for var in variaveis_obrigatorias}
