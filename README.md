@@ -1,5 +1,6 @@
 # Desafio Lighthouse — Indicium AI
 
+```
 desafio_dados_e_ia_lighthouse/
 ├── csv/                               # CSVs de origem (dados carregados no banco)
 │   ├── addresses.csv
@@ -48,6 +49,7 @@ desafio_dados_e_ia_lighthouse/
 ├── .gitignore
 ├── docker-compose.yml                 # Sobe o PostgreSQL local
 └── requirements.txt                   # Dependências Python
+```
 
 ## Como rodar o projeto
 
@@ -117,13 +119,13 @@ python data_loader.py
 
 ### 9. Executar as análises SQL
 
-As consultas estão na pasta `sql_questões/`. Execute com `psql` ou o cliente SQL de sua preferência:
+As consultas estão na pasta `sql/analysis/`. Execute com `psql` ou o cliente SQL de sua preferência (utilizei o [DBeaver](https://dbeaver.io/)):
 
 ```bash
-psql "postgresql://seu_user_aqui:sua_senha_aqui@localhost:5432/db_lighthouse" -f sql_questões/4_1_clients_analysis.sql
+psql "postgresql://seu_user_aqui:sua_senha_aqui@localhost:5432/db_lighthouse" -f sql/analysis/4.1_clients_analysis.sql
 ```
 
-Repita o comando trocando o nome do arquivo para as demais consultas (`1_1_overview_orders.sql`, `3_2_sum_lines_validation.sql`, `5_1_calendar_sales.sql`).
+Repita o comando trocando o nome do arquivo para as demais consultas (`1.1_overview_orders.sql`, `3.2_sum_lines_validation.sql`, `5.1_calendar+sales.sql`).
 
 ### 10. Rodar a previsão de demanda
 
