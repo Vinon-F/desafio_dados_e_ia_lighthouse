@@ -1,5 +1,6 @@
 # Desafio Lighthouse — Indicium AI
 
+Estrutura de Pastas
 ```
 desafio_dados_e_ia_lighthouse/
 ├── csv/                               # CSVs de origem (dados carregados no banco)
