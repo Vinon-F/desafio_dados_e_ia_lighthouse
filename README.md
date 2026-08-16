@@ -1,6 +1,8 @@
 # Desafio Lighthouse — Indicium AI
 
-Estrutura de Pastas
+Projeto desenvolvido para o Desafio Lighthouse (Indicium AI), cobrindo o pipeline completo de dados: ingestão dos CSVs em um banco PostgreSQL, análises SQL de negócio e modelos de previsão de demanda e recomendação de produtos. Repositório criado para facilitar a correção.
+
+## Estrutura de Pastas
 ```
 desafio_dados_e_ia_lighthouse/
 ├── csv/                               # CSVs de origem (dados carregados no banco)
