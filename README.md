@@ -1,30 +1,53 @@
 # Desafio Lighthouse — Indicium AI
 
 desafio_dados_e_ia_lighthouse/
-├── csv/                              # CSVs de origem (dados carregados no banco)
+├── csv/                               # CSVs de origem (dados carregados no banco)
+│   ├── addresses.csv
+│   ├── attributes.csv
+│   ├── brands.csv
+│   ├── categories.csv
+│   ├── customers.csv
+│   ├── employees.csv
+│   ├── fiscal_invoices.csv
+│   ├── goods_receipt_items.csv
+│   ├── goods_receipts.csv
+│   ├── locations.csv
+│   ├── order_items.csv
+│   ├── orders.csv
+│   ├── payments.csv
+│   ├── product_suppliers.csv
+│   ├── product_variants.csv
+│   ├── products.csv
+│   ├── purchase_order_items.csv
+│   ├── purchase_orders.csv
+│   ├── return_items.csv
+│   ├── returns.csv
+│   ├── stock_levels.csv
+│   ├── stock_movements.csv
+│   ├── suppliers.csv
+│   └── variant_attribute_values.csv
 │
-├── elt/                              # Extract-Load-Transform
-│   ├── schema_generator.py           # Gera schema.sql a partir dos CSVs
-│   ├── run_schema.py                 # Executa o schema.sql no PostgreSQL
-│   ├── data_loader.py                # Carrega os CSVs nas tabelas
-│   └── schema.sql                    # DDL gerado (CREATE TABLE ...)
+├── elt/                               # Extract-Load-Transform
+│   ├── schema_generator.py            # Gera schema.sql a partir dos CSVs
+│   ├── run_schema.py                  # Executa o schema.sql no PostgreSQL
+│   ├── data_loader.py                 # Carrega os CSVs nas tabelas
+│   └── schema.sql                     # (CREATE TABLE ...)
 │
-├── modeling/                         # Modelagem preditiva e recomendação
-│   ├── forecasting.py                # Previsão de demanda
-│   └── recommendation_engine.py      # Similaridade de cosseno entre produtos
+├── modeling/                          # Modelagem preditiva e recomendação
+│   ├── forecasting.py                 # Previsão de demanda
+│   └── recommendation_engine.py       # Similaridade de cosseno entre produtos
 │
 ├── sql/
-│   ├── analisys/                     # Consultas de análise de negócio
-│   │   ├── 1_1_overview_orders.sql
-│   │   ├── 3_2_sum_lines_validation.sql
-│   │   ├── 4_1_clients_analysis.sql
-│   │   └── 5_1_calendar_sales.sql
-│   └── views/                        # Views que alimentam o dashboard de BI
+│   └── analysis/                      # Consultas de análise de negócio
+│       ├── 1.1_overview_orders.sql
+│       ├── 3.2_sum_lines_validation.sql
+│       ├── 4.1_clients_analysis.sql
+│       └── 5.1_calendar+sales.sql
 │
-├── .env.exemple                      # Modelo de variáveis de ambiente
+├── .env.exemple                       # Modelo de variáveis de ambiente
 ├── .gitignore
-├── docker-compose.yml                # Sobe o PostgreSQL local
-└── requirements.txt                  # Dependências Python
+├── docker-compose.yml                 # Sobe o PostgreSQL local
+└── requirements.txt                   # Dependências Python
 
 ## Como rodar o projeto
 
@@ -67,15 +90,14 @@ docker compose ps
 
 ```bash
 python -m venv .venv
-source .venv/bin/activate       # Linux/macOS
-.venv\Scripts\activate          # Windows
-
+source .venv/bin/activate       # Gitbash
 pip install -r requirements.txt
 ```
 
-### 6. Gerar o schema a partir dos CSVs
+### 6. Entrar na pasta `elt/` e gerar o schema a partir dos CSVs
 
 ```bash
+cd elt
 python schema_generator.py
 ```
 
@@ -105,7 +127,10 @@ Repita o comando trocando o nome do arquivo para as demais consultas (`1_1_overv
 
 ### 10. Rodar a previsão de demanda
 
+Saindo da pasta `elt/`, vá até a raiz do projeto e entre em `modeling/`:
+
 ```bash
+cd ../modeling
 python forecasting.py
 ```
 
